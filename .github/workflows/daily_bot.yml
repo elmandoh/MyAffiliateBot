@@ -1,8 +1,8 @@
 name: Daily Affiliate Bot
 on:
   schedule:
-    - cron: '0 */6 * * *' # تشغيل كل 6 ساعات
-  workflow_dispatch: # زر للتشغيل اليدوي للتجربة
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,4 +18,5 @@ jobs:
         env:
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}  # <--- تأكد من إضافة هذا السطر
         run: python bot.py
