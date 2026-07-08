@@ -1,17 +1,13 @@
 import os
 import sys
+import json
 from atproto import Client
 from groq import Groq
-import requests
 
-# 1. توجيه البوت للمجلد 'python' الموجود في مستودعك
-# بما أنك رفعت المجلد 'python' إلى المجلد الرئيسي للمشروع
-python_sdk_path = os.path.join(os.getcwd(), 'python')
-if python_sdk_path not in sys.path:
-    sys.path.append(python_sdk_path)
+# 1. توجيه المسار للمجلد 'python' الذي رفعته
+sys.path.append(os.path.join(os.getcwd(), 'python'))
 
-# 2. استيراد المكتبة من المجلد الذي رفعته
-# وفقاً لصورك، المكتبة موجودة داخل 'python/iop'
+# 2. الاستيراد الصحيح للمكتبة المرفوعة
 from iop.base import IopClient, IopRequest
 
 # إعداد العملاء
@@ -20,37 +16,40 @@ bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 def get_aliexpress_product():
+    # استخدام بيانات الاعتماد من GitHub Secrets
     app_key = os.environ["ALIEXPRESS_APP_KEY"]
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     
+    # تهيئة العميل (IopClient هو الحل الصحيح للـ Signature)
     client = IopClient("https://api-sg.aliexpress.com/sync", app_key, app_secret)
     
+    # بناء الطلب الصحيح
     request = IopRequest("aliexpress.affiliate.hotproduct.query")
     request.add_api_param("commission_rate_min", "1000")
     request.add_api_param("fields", "product_title,promotion_link,app_sale_price")
     
-    try:
-        response = client.execute(request)
-        
-        # طباعة محتوى الاستجابة بالكامل لمعرفة بنيتها (للديبيج)
-        print("Response object type:", type(response))
-        print("Response content:", response.body) # تأكد هنا إذا كانت البيانات موجودة
-        
-        # بدلاً من is_success، نتحقق من وجود البيانات مباشرة أو من رمز الحالة إن وجد
-        if response.body:
-            import json
-            data = json.loads(response.body)
-            # استخراج النتائج من هيكل الـ JSON المعتاد لـ AliExpress
-            result = data.get('aliexpress_affiliate_hotproduct_query_response', {})\
-                         .get('resp_result', {}).get('result', {})
-            products = result.get('products', {}).get('product', [])
-            return products[0] if products else None
-        else:
-            print("Response body is empty.")
-            return None
-    except Exception as e:
-        print(f"Request failed: {e}")
+    # تنفيذ الطلب
+    response = client.execute(request)
+    
+    # التحقق من الاستجابة (بناءً على هيكلية IopResponse)
+    if response.body:
+        data = json.loads(response.body)
+        # الوصول للمنتجات من هيكل الـ JSON
+        result = data.get('aliexpress_affiliate_hotproduct_query_response', {})\
+                     .get('resp_result', {}).get('result', {})
+        products = result.get('products', {}).get('product', [])
+        return products[0] if products else None
+    else:
+        print(f"API Error: {response.type} - {response.message}")
         return None
+
+# --- باقي الكود ---
+product = get_aliexpress_product()
+if product:
+    print("تم جلب المنتج بنجاح!")
+    # كمل باقي منطق النشر هنا...
+else:
+    print("لم يتم العثور على منتج.")
 # --- باقي الكود (generate_content و post_to_github_report) كما هو ---
 # ...
 
