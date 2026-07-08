@@ -2,4 +2,3 @@ atproto
 requests
 python-dotenv
 groq
-aliexpress-api
