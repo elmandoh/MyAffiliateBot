@@ -4,69 +4,65 @@ import json
 from atproto import Client
 from groq import Groq
 
-# 1. إضافة المجلد الرئيسي الذي يحتوي على مجلد 'iop' إلى مسار بايثون
-# تأكد أن المجلد المسمى 'iop' موجود مباشرة في المجلد الرئيسي لمشروعك
-sys.path.append(os.getcwd())
+# 1. إضافة مسار المكتبة
 
-# 2. الاستيراد الصحيح
+sys.path.append(os.path.join(os.getcwd(), 'python'))
 from iop.base import IopClient, IopRequest
 
-# إعداد العملاء (تأكد من وجود المتغيرات في GitHub Secrets)
+# 2. إعداد العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-def get_aliexpress_product():
-    app_key = os.environ["ALIEXPRESS_APP_KEY"]
-    app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
+USED_PRODUCTS_FILE = "used_products.json"
+
+def get_used_products():
+    if not os.path.exists(USED_PRODUCTS_FILE): return []
+    with open(USED_PRODUCTS_FILE, 'r') as f: return json.load(f)
+
+def save_used_product(product_id):
+    used = get_used_products()
+    used.append(str(product_id))
+    with open(USED_PRODUCTS_FILE, 'w') as f: json.dump(used, f)
+
+# 3. اقتراح المنتجات من Groq
+def get_product_ideas():
+    prompt = "Suggest 10 trending unique electronic products on AliExpress. Return ONLY a JSON list with 'name' and 'search_query' for each product."
+    response = groq.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile")
+    return json.loads(response.choices[0].message.content)
+
+# 4. البحث وجلب البيانات
+def get_aliexpress_product(query):
+    client = IopClient("https://api-sg.aliexpress.com/sync", os.environ["ALIEXPRESS_APP_KEY"], os.environ["ALIEXPRESS_APP_SECRET"])
+    request = IopRequest("aliexpress.affiliate.product.query")
+    request.add_api_param("keywords", query)
+    request.add_api_param("fields", "product_id,product_title,promotion_link,app_sale_price")
     
-    # 3. استخدام IopClient للتعامل مع الـ Signature تلقائياً
-    client = IopClient("https://api-sg.aliexpress.com/sync", app_key, app_secret)
-    
-    # 4. بناء الطلب
-    request = IopRequest("aliexpress.affiliate.hotproduct.query")
-    request.add_api_param("commission_rate_min", "1000")
-    request.add_api_param("fields", "product_title,promotion_link,app_sale_price")
-    
-    # 5. التنفيذ
     response = client.execute(request)
-    
-    # التحقق من نجاح الطلب
-    if response.code == "0":  # 0 تعني النجاح في هذه المكتبة
+    if response.code == "0":
         data = json.loads(response.body)
-        result = data.get('aliexpress_affiliate_hotproduct_query_response', {})\
-                     .get('resp_result', {}).get('result', {})
-        products = result.get('products', {}).get('product', [])
+        products = data.get('aliexpress_affiliate_product_query_response', {}).get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
         return products[0] if products else None
+    return None
+
+# 5. صياغة المنشور
+def generate_post(product):
+    prompt = f"Write an engaging US-style marketing post for Bluesky about this product: {product['product_title']}. Price: {product['app_sale_price']}. Link: {product['promotion_link']}. Keep it short and viral."
+    completion = groq.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile")
+    return completion.choices[0].message.content
+
+# --- تنفيذ الدورة ---
+ideas = get_product_ideas()
+for item in ideas:
+    product = get_aliexpress_product(item['search_query'])
+    if product and str(product['product_id']) not in get_used_products():
+        # نشر المنشور
+        post_text = generate_post(product)
+        bsky.send_post(text=post_text)
+        
+        # حفظ المنتج لمنع تكراره
+        save_used_product(product['product_id'])
+        print(f"تم نشر المنتج: {product['product_title']}")
+        break # نكتفي بمنتج واحد في كل دورة كل ساعتين
     else:
-        print(f"API Error: {response.message} (Code: {response.code})")
-        return None
-
-def generate_content(prompt):
-    completion = groq.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile"
-    )
-    return completion.choices[0].message.content[:280]
-
-    # تأكد من هذا الجزء في دالة post_to_github_report
-def post_to_github_report(content):
-    url = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/issues"
-    # لاحظ أننا نستخدم os.environ['GITHUB_TOKEN'] الذي مررناه من الـ Workflow
-    headers = {"Authorization": f"token {os.environ['GITHUB_TOKEN']}"} 
-    requests.post(url, json={"title": "Daily Bot Report", "body": f"Published: {content}"}, headers=headers)
-
-# منطق العمل
-# --- التشغيل الأساسي ---
-product = get_aliexpress_product()
-
-if product:
-    # سيتم تنفيذ هذا الجزء فقط إذا تم جلب منتج سليم
-    prompt = f"Write a casual, helpful US-style recommendation for {product['name']} (Price: {product['price']}). Include link: {product['link']}."
-    post_content = generate_content(prompt)
-    bsky.send_post(text=post_content)
-    post_to_github_report(post_content)
-    print("تم النشر بنجاح!")
-else:
-    # البوت سيتوقف هنا بسلام ولن يظهر أي خطأ أحمر
-    print("لم يتم العثور على منتج سليم. البوت ينهي عمله بسلام.")
-    exit(0)
+        continue
