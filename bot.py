@@ -20,34 +20,37 @@ bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 def get_aliexpress_product():
-    # استخدام IopClient الخاص بالمكتبة التي رفعتها
     app_key = os.environ["ALIEXPRESS_APP_KEY"]
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     
     client = IopClient("https://api-sg.aliexpress.com/sync", app_key, app_secret)
     
-    # بناء الطلب حسب هيكلية مكتبة IOP
     request = IopRequest("aliexpress.affiliate.hotproduct.query")
     request.add_api_param("commission_rate_min", "1000")
     request.add_api_param("fields", "product_title,promotion_link,app_sale_price")
     
     try:
         response = client.execute(request)
-        if response.is_success():
-            # تحويل النص إلى JSON لاستخراج البيانات
+        
+        # طباعة محتوى الاستجابة بالكامل لمعرفة بنيتها (للديبيج)
+        print("Response object type:", type(response))
+        print("Response content:", response.body) # تأكد هنا إذا كانت البيانات موجودة
+        
+        # بدلاً من is_success، نتحقق من وجود البيانات مباشرة أو من رمز الحالة إن وجد
+        if response.body:
             import json
             data = json.loads(response.body)
+            # استخراج النتائج من هيكل الـ JSON المعتاد لـ AliExpress
             result = data.get('aliexpress_affiliate_hotproduct_query_response', {})\
                          .get('resp_result', {}).get('result', {})
             products = result.get('products', {}).get('product', [])
             return products[0] if products else None
         else:
-            print(f"API Error: {response.message}")
+            print("Response body is empty.")
             return None
     except Exception as e:
         print(f"Request failed: {e}")
         return None
-
 # --- باقي الكود (generate_content و post_to_github_report) كما هو ---
 # ...
 
