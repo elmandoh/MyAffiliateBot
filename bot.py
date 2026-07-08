@@ -52,6 +52,7 @@ def call_aliexpress_api(method, api_params={}):
 # ---- الكود الأوتوماتيكي المحدث والمقاوم للأخطاء ----
 
 # ---- الكود الأوتوماتيكي المظبوط بالـ Tracking ID ----
+# ---- الكود الأوتوماتيكي المظبوط والنهائي بعد تصحيح اسم الميثود ----
 
 if __name__ == "__main__":
     # 1. قراءة الـ Tracking ID من الـ Secrets
@@ -60,12 +61,13 @@ if __name__ == "__main__":
     print("🚀 بدء تشغيل البوت الأوتوماتيكي...")
     print("📥 جاري سحب المنتجات الأكثر مبيعاً (Hot Products) حالياً...")
     
-    hot_method = "aliexpress.affiliate.hotproducts.get"
+    # 🌟 التصحيح السحري هنا: اسم الميثود الصح في موقع علي إكسبريس هو hotproduct.query
+    hot_method = "aliexpress.affiliate.hotproduct.query"
     hot_params = {
         "fields": "product_title,product_detail_url,sale_price",
         "target_currency": "USD",
         "target_language": "EN",
-        "tracking_id": TRACKING_ID,  # 🌟 ضفنا الـ Tracking ID هنا كمان عشان السيرفر يوافق
+        "tracking_id": TRACKING_ID,
         "page_no": "1",
         "page_size": "1"
     }
@@ -79,7 +81,8 @@ if __name__ == "__main__":
             err_data = hot_response["error_response"]
             print(f"❌ رفض من منصة علي إكسبريس: {err_data.get('msg')} | التفاصيل: {err_data.get('sub_msg')}")
         else:
-            resp_result = hot_response.get("aliexpress_affiliate_hotproducts_get_response", {}).get("resp_result", {})
+            # 🌟 تم تعديل مفتاح الاستجابة ليتوافق مع الميثود الصحيحة (query بدل get)
+            resp_result = hot_response.get("aliexpress_affiliate_hotproduct_query_response", {}).get("resp_result", {})
             
             if resp_result.get("resp_code") == 200:
                 products_list = resp_result.get("result", {}).get("products", {}).get("product", [])
