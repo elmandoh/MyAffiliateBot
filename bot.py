@@ -10,6 +10,40 @@ from atproto import Client
 from groq import Groq
 
 
+
+import zipfile
+import shutil
+
+# 1. إعداد المسارات
+sdk_zip = "aliexpress_sdk.zip"
+sdk_folder = "aliexpress_sdk_content"
+sdk_url = "https://ae-open-platform-public.oss-ap-southeast-1.aliyuncs.com/sdk/1.0.2-1699927624346NFOi.zip"
+
+# 2. تحميل وفك الضغط تلقائياً
+if not os.path.exists(sdk_folder):
+    print("Downloading SDK...")
+    response = requests.get(sdk_url)
+    with open(sdk_zip, 'wb') as f:
+        f.write(response.content)
+    
+    with zipfile.ZipFile(sdk_zip, 'r') as zip_ref:
+        zip_ref.extractall(sdk_folder)
+    
+    # حذف ملف الزيپ بعد الفك
+    os.remove(sdk_zip)
+    print("SDK ready.")
+
+# 3. إضافة المجلد لمسار البحث الخاص ببايثون
+import sys
+sys.path.append(os.path.join(os.getcwd(), sdk_folder))
+
+# الآن يمكنك استيراد المكتبة وكأنها مثبتة
+from aliexpress.api.rest import AliexpressAffiliateHotproductQueryRequest
+from aliexpress.api import TopApiClient
+
+
+
+
 # 1. إعداد العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
