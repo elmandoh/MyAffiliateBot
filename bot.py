@@ -1,39 +1,53 @@
 import os
 import random
+import requests
+import hmac
+import hashlib
+import time
 from atproto import Client
 from groq import Groq
-from aliexpress_api import AliexpressApi
 
-# الإعدادات
+# 1. إعداد العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
-ali = AliexpressApi(os.environ["ALIEXPRESS_APP_KEY"], os.environ["ALIEXPRESS_APP_SECRET"], models="api.aliexpress.com")
 
-def get_ai_response(prompt):
+def get_aliexpress_product():
+    # توقيع الطلب (Signature) لجلب منتجات عالية العمولة
+    app_key = os.environ["ALIEXPRESS_APP_KEY"]
+    app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
+    timestamp = str(int(time.time() * 1000))
+    params = {
+        "method": "aliexpress.affiliate.hotproduct.query",
+        "app_key": app_key, "format": "json", "timestamp": timestamp,
+        "v": "2.0", "sign_method": "hmac",
+        "commission_rate_min": "1000", "price_min": "15", "price_max": "100",
+        "sort": "commission_rate_desc", "fields": "product_title,promotion_link,app_sale_price"
+    }
+    params_sorted = "".join([f"{k}{v}" for k, v in sorted(params.items())])
+    params["sign"] = hmac.new(app_secret.encode('utf-8'), params_sorted.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+    
+    response = requests.get("https://api-sg.aliexpress.com/sync", params=params).json()
+    product = random.choice(response['aliexpress_affiliate_hotproduct_query_response']['resp_result']['result']['products']['product'])
+    return {"name": product['product_title'], "price": product['app_sale_price'], "link": product['promotion_link']}
+
+def generate_content(prompt):
     completion = groq.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile"
     )
     return completion.choices[0].message.content[:280]
 
-def interact_with_others():
-    # البحث عن منشورات تقنية حديثة في أمريكا
-    posts = bsky.app.bsky.feed.search_posts(params={'q': 'smart home', 'limit': 5})
-    for post in posts.posts:
-        if random.random() > 0.5: # 50% فرصة للتعليق
-            comment = get_ai_response(f"Write a friendly, insightful 1-sentence comment on this post: {post.record.text}")
-            bsky.send_post(text=comment, reply_to=post.uri)
-            print("تم التعليق على منشور!")
-            break
+def post_to_github_report(content):
+    url = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/issues"
+    headers = {"Authorization": f"token {os.environ['GITHUB_TOKEN']}"}
+    requests.post(url, json={"title": "Daily Bot Report", "body": f"Published: {content}"}, headers=headers)
 
-def post_affiliate():
-    products = ali.get_hot_products(cat_ids=[34], limit=1)
-    p = products[0]
-    prompt = f"Write a helpful, non-salesy recommendation for {p.product_title}. Link: {p.promotion_link}. Be conversational, like a friend."
-    bsky.send_post(text=get_ai_response(prompt))
+# منطق العمل
+product = get_aliexpress_product()
+prompt = f"Write a casual, helpful US-style recommendation for {product['name']} (Price: {product['price']}). Include link: {product['link']}. Use a friendly tone, ask a question at the end."
+post_content = generate_content(prompt)
 
-# المنطق الرئيسي: تفاعل ثم انشر
-if random.choice([True, False]):
-    interact_with_others()
-post_affiliate()
+# النشر + التقرير
+bsky.send_post(text=post_content)
+post_to_github_report(post_content)
+print("تم النشر والتقرير بنجاح!")
