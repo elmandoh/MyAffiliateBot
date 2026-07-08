@@ -1,3 +1,5 @@
+import requests
+import json
 import os
 import random
 import requests
@@ -8,34 +10,63 @@ from atproto import Client
 from groq import Groq
 
 
-# بعد تثبيت المكتبة أو وضعها في المجلد
-from aliextop.api.rest import AliexpressAffiliateHotproductQueryRequest
-from aliextop.api import TopApiClient
+
+
+
 
 # 1. إعداد العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
+
+
 def get_aliexpress_product():
-    # إعداد العميل الرسمي
-    client = TopApiClient(app_key=os.environ["ALIEXPRESS_APP_KEY"], 
-                          app_secret=os.environ["ALIEXPRESS_APP_SECRET"], 
-                          top_gateway_url="https://api-sg.aliexpress.com/sync")
+    # تأكد أن هذه القيم موجودة في الـ Secrets باسمها الصحيح
+    app_key = os.environ["ALIEXPRESS_APP_KEY"]
+    app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     
-    # طلب المنتج باستخدام الكلاس الجاهز (بدون تعقيد التوقيع)
-    req = AliexpressAffiliateHotproductQueryRequest()
-    req.commission_rate_min = "1000"
-    req.fields = "product_title,promotion_link,app_sale_price"
+    timestamp = str(int(time.time() * 1000))
     
-    try:
-        resp = client.execute(req)
-        # المكتبة ستقوم بإرجاع البيانات جاهزة ومنظمة
-        # هنا تتعامل مع الرد مباشرة
-        return resp.get('products')[0] 
-    except Exception as e:
-        print(f"Error using SDK: {e}")
-        return None
+    # 1. إعداد المعاملات الأساسية (بدون ترتيب مسبق)
+    params = {
+        "app_key": app_key,
+        "format": "json",
+        "method": "aliexpress.affiliate.hotproduct.query",
+        "sign_method": "hmac",
+        "timestamp": timestamp,
+        "v": "2.0",
+        "fields": "product_title,promotion_link,app_sale_price",
+        "commission_rate_min": "1000"
+    }
+
+    # 2. الترتيب الأبجدي (شرط أساسي)
+    sorted_keys = sorted(params.keys())
+    
+    # 3. بناء نص التوقيع (يجب دمج المفتاح والقيمة مباشرة)
+    sign_str = ""
+    for k in sorted_keys:
+        sign_str += k + str(params[k])
+    
+    # 4. التوقيع النهائي
+    sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+    params["sign"] = sign
+
+    # 5. الطلب
+    response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
+    
+    # 6. معالجة الرد
+    if response.status_code == 200:
+        data = response.json()
+        try:
+            # الوصول للبيانات
+            products = data['aliexpress_affiliate_hotproduct_query_response']['resp_result']['result']['products']['product']
+            p = products[0]
+            return {"name": p['product_title'], "price": p['app_sale_price'], "link": p['promotion_link']}
+        except Exception as e:
+            print("خطأ في البيانات:", data) # هنا سنرى بالضبط ما يرسله علي إكسبريس
+            return None
+    return None
 
 def generate_content(prompt):
     completion = groq.chat.completions.create(
