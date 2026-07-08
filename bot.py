@@ -47,72 +47,78 @@ def call_aliexpress_api(method, api_params={}):
 
 # ---- التعديل الذكي لتفادي قائمة العروض الفاضية ----
 
+# ---- الكود الأوتوماتيكي بالكامل: سحب وتحويل ديناميكي ----
+
 if __name__ == "__main__":
-    # 1. قراءة الـ Tracking ID
+    # 1. قراءة الـ Tracking ID من الـ Secrets
     TRACKING_ID = os.getenv("ALIEXPRESS_TRACKING_ID", "").strip()
     
-    print("🚀 بدء تشغيل البوت وجلب البيانات...")
+    print("🚀 بدء تشغيل البوت الأوتوماتيكي...")
+    print("📥 جاري سحب المنتجات الأكثر مبيعاً (Hot Products) حالياً...")
     
-    target_url = None
-    promo_name = ""
-    
-    # محاولة جلب العروض العامة أولاً
-    promo_method = "aliexpress.affiliate.featuredpromo.get" 
-    promo_params = {
-        "fields": "promo_desc,image_url,promo_name",
+    # استخدام ميثود المنتجات الأكثر مبيعاً المتاحة في حسابك
+    hot_method = "aliexpress.affiliate.hotproducts.get"
+    hot_params = {
+        "fields": "product_title,product_detail_url,sale_price",
         "page_no": "1",
-        "page_size": "1"
+        "page_size": "1"  # هناخد أول منتج متصدر علطول
     }
     
     try:
-        promo_response = call_aliexpress_api(promo_method, promo_params)
-        resp_result = promo_response.get("aliexpress_affiliate_featuredpromo_get_response", {}).get("resp_result", {})
+        # استدعاء الـ API لسحب المنتجات
+        hot_response = call_aliexpress_api(hot_method, hot_params)
+        
+        # فك تشفير الـ JSON القادم من السيرفر
+        resp_result = hot_response.get("aliexpress_affiliate_hotproducts_get_response", {}).get("resp_result", {})
         
         if resp_result.get("resp_code") == 200:
-            promo_list = resp_result.get("result", {}).get("promo_list", {}).get("featured_promo", [])
-            if promo_list:
-                target_url = promo_list[0].get("promo_link")
-                promo_name = promo_list[0].get("promo_name")
-                print(f"📦 تم العثور على عرض رسمي: {promo_name}")
-    except Exception as e:
-        print(f"⚠️ خطأ أثناء محاولة جلب العروض العامة: {e}")
-
-    # 2. الخطة البديلة: لو الميثود اللي فوق رجعت فاضية، استخدم رابط منتج حقيقي فوراً للتجربة
-    if not target_url:
-        print("⚠️ لم يتم العثور على عروض عامة حالياً من علي إكسبريس.")
-        print("🔄 كخطة بديلة، سيتم استخدام رابط منتج حقيقي للتأكد من عمل نظام الآفلييت...")
-        # رابط منتج حقيقي عشوائي من علي إكسبريس للتجربة
-        target_url = "https://www.aliexpress.com/item/1005005814523924.html"
-        promo_name = "منتج تجاري عشوائي"
-        
-    print(f"🔗 الرابط المستهدف للتحويل: {target_url}")
-
-    # 3. خطوة توليد رابط الآفلييت الخاص بك
-    print("🔄 جاري تحويل الرابط إلى رابط آفلييت خاص بك...")
-    try:
-        link_gen_method = "aliexpress.affiliate.link.generate"
-        link_gen_params = {
-            "tracking_id": TRACKING_ID,
-            "promotion_link_type": "0", 
-            "source_values": target_url 
-        }
-        
-        link_response = call_aliexpress_api(link_gen_method, link_gen_params)
-        links_result = link_response.get("aliexpress_affiliate_link_generate_response", {}).get("resp_result", {})
-        
-        if links_result.get("resp_code") == 200:
-            affiliate_links = links_result.get("result", {}).get("live_link_list", {}).get("live_link", [])
-            if affiliate_links:
-                my_affiliate_link = affiliate_links[0].get("promotion_link")
+            products_list = resp_result.get("result", {}).get("products", {}).get("product", [])
+            
+            if products_list:
+                # سحب بيانات المنتج الأول أوتوماتيكياً
+                live_product = products_list[0]
+                product_title = live_product.get("product_title")
+                product_url = live_product.get("product_detail_url") # الرابط الأصلي للمنتج
+                price = live_product.get("sale_price")
                 
-                print("\n==================================================")
-                print("🎉 مبروووك! تم توليد رابط الآفلييت الخاص بك بنجاح:")
-                print(f"💰 رابط العمولة: {my_affiliate_link}")
-                print("==================================================\n")
+                print(f"📦 تم سحب المنتج بنجاح: {product_title}")
+                print(f"💰 السعر الحالي: {price}")
+                print(f"🔗 الرابط الأصلي المسحوب: {product_url}")
+                
+                # 2. خطوة التحويل الفوري لروابط الآفلييت الخاصة بك
+                print("🔄 جاري تحويل الرابط أوتوماتيكياً إلى رابط العمولة الخاص بك...")
+                link_gen_method = "aliexpress.affiliate.link.generate"
+                link_gen_params = {
+                    "tracking_id": TRACKING_ID,
+                    "promotion_link_type": "0", 
+                    "source_values": product_url  # الرابط اللي اتسحب أوتوماتيك فوق
+                }
+                
+                # توليد رابط الآفلييت
+                link_response = call_aliexpress_api(link_gen_method, link_gen_params)
+                links_result = link_response.get("aliexpress_affiliate_link_generate_response", {}).get("resp_result", {})
+                
+                if links_result.get("resp_code") == 200:
+                    affiliate_links = links_result.get("result", {}).get("live_link_list", {}).get("live_link", [])
+                    if affiliate_links:
+                        my_affiliate_link = affiliate_links[0].get("promotion_link")
+                        
+                        print("\n==================================================")
+                        print("🎉 نجاح باهر! السيستم سحب وحوّل بالكامل أوتوماتيك:")
+                        print(f"📢 المنتج: {product_title}")
+                        print(f"💸 رابط الآفلييت المبروك: {my_affiliate_link}")
+                        print("==================================================\n")
+                        
+                        # هنا نقدر نبعت النص الجاهز ده لـ Groq و Bluesky في الخطوة الجاية!
+                        
+                    else:
+                        print("⚠️ السيرفر لم يرجع روابط آفلييت في القائمة.")
+                else:
+                    print(f"❌ فشل توليد رابط الآفلييت. السبب: {links_result.get('resp_msg')}")
             else:
-                print("⚠️ السيرفر استجاب ولكن قائمة الروابط فارغة.")
+                print("⚠️ قائمة المنتجات الأكثر مبيعاً رجعت فارغة من السيرفر.")
         else:
-            print(f"❌ فشل توليد الرابط. السبب: {links_result.get('resp_msg')}")
+            print(f"❌ فشل سحب المنتجات. السبب: {resp_result.get('resp_msg')}")
             
     except Exception as e:
-        print(f"❌ حدث خطأ غير متوقع أثناء التوليد: {str(e)}")
+        print(f"❌ حدث خطأ غير متوقع في الدورة الأوتوماتيكية: {str(e)}")
