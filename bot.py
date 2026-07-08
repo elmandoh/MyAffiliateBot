@@ -15,52 +15,42 @@ groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 def get_aliexpress_product():
     app_key = os.environ["ALIEXPRESS_APP_KEY"]
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
-    timestamp = str(int(time.time() * 1000))
     
     params = {
         "app_key": app_key,
         "format": "json",
         "method": "aliexpress.affiliate.hotproduct.query",
         "sign_method": "hmac",
-        "timestamp": timestamp,
+        "timestamp": str(int(time.time() * 1000)),
         "v": "2.0",
         "fields": "product_title,promotion_link,app_sale_price",
         "commission_rate_min": "1000"
     }
 
-    # التوقيع الرقمي (Signature)
-    keys = sorted(params.keys())
-    sign_str = "".join([f"{k}{params[k]}" for k in keys])
-    params["sign"] = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+    # الترتيب الأبجدي الصارم (سر نجاح التوقيع)
+    sorted_keys = sorted(params.keys())
+    sign_str = "".join([f"{k}{params[k]}" for k in sorted_keys])
+    
+    # إنشاء التوقيع
+    sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+    params["sign"] = sign
 
     response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
     data = response.json()
     
-    # --- سحر الحل هنا: البحث الذكي عن البيانات ---
-    # نستخدم دالة recursive للبحث عن 'product_title' في أي مكان داخل الرد
-    def find_key(obj, key):
-        if key in obj: return obj[key]
-        for v in obj.values():
-            if isinstance(v, dict):
-                res = find_key(v, key)
-                if res: return res
-        return None
-
+    # فحص النتيجة
     try:
-        # استخراج البيانات بمرونة
-        title = find_key(data, 'product_title')
-        link = find_key(data, 'promotion_link')
-        price = find_key(data, 'app_sale_price')
+        resp = data.get('aliexpress_affiliate_hotproduct_query_response', {})
+        res_result = resp.get('resp_result', {})
+        result = res_result.get('result', {})
+        products = result.get('products', {}).get('product', [])
         
-        if title and link:
-            return {"name": title, "price": price, "link": link}
-        else:
-            print("لم يتم العثور على منتجات في الرد. الرد الكامل:", data)
-            return None
-    except Exception as e:
-        print(f"حدث خطأ أثناء المعالجة: {e}")
-        return None
-
+        if products:
+            p = products[0]
+            return {"name": p['product_title'], "price": p['app_sale_price'], "link": p['promotion_link']}
+    except:
+        pass
+    return None
 
 
 def generate_content(prompt):
@@ -77,9 +67,17 @@ def post_to_github_report(content):
     requests.post(url, json={"title": "Daily Bot Report", "body": f"Published: {content}"}, headers=headers)
 
 # منطق العمل
+# --- تشغيل البوت ---
 product = get_aliexpress_product()
-prompt = f"Write a casual, helpful US-style recommendation for {product['name']} (Price: {product['price']}). Include link: {product['link']}. Use a friendly tone, ask a question at the end."
-post_content = generate_content(prompt)
+
+if product:  # هذا الشرط مهم جداً (يمنع الخطأ إذا لم نجد منتجاً)
+    prompt = f"Write a casual, helpful US-style recommendation for {product['name']} (Price: {product['price']}). Include link: {product['link']}. Use a friendly tone, ask a question at the end."
+    post_content = generate_content(prompt)
+    bsky.send_post(text=post_content)
+    post_to_github_report(post_content)
+    print("تم النشر والتقرير بنجاح!")
+else:
+    print("لم يتم العثور على منتج، البوت سينتظر المرة القادمة.")
 
 # النشر + التقرير
 bsky.send_post(text=post_content)
