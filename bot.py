@@ -4,55 +4,43 @@ import json
 from atproto import Client
 from groq import Groq
 
-# 1. توجيه المسار للمجلد 'python' الذي رفعته
-sys.path.append(os.path.join(os.getcwd(), 'python'))
+# 1. إضافة المجلد الرئيسي الذي يحتوي على مجلد 'iop' إلى مسار بايثون
+# تأكد أن المجلد المسمى 'iop' موجود مباشرة في المجلد الرئيسي لمشروعك
+sys.path.append(os.getcwd())
 
-# 2. الاستيراد الصحيح للمكتبة المرفوعة
+# 2. الاستيراد الصحيح
 from iop.base import IopClient, IopRequest
 
-# إعداد العملاء
+# إعداد العملاء (تأكد من وجود المتغيرات في GitHub Secrets)
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 def get_aliexpress_product():
-    # استخدام بيانات الاعتماد من GitHub Secrets
     app_key = os.environ["ALIEXPRESS_APP_KEY"]
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     
-    # تهيئة العميل (IopClient هو الحل الصحيح للـ Signature)
+    # 3. استخدام IopClient للتعامل مع الـ Signature تلقائياً
     client = IopClient("https://api-sg.aliexpress.com/sync", app_key, app_secret)
     
-    # بناء الطلب الصحيح
+    # 4. بناء الطلب
     request = IopRequest("aliexpress.affiliate.hotproduct.query")
     request.add_api_param("commission_rate_min", "1000")
     request.add_api_param("fields", "product_title,promotion_link,app_sale_price")
     
-    # تنفيذ الطلب
+    # 5. التنفيذ
     response = client.execute(request)
     
-    # التحقق من الاستجابة (بناءً على هيكلية IopResponse)
-    if response.body:
+    # التحقق من نجاح الطلب
+    if response.code == "0":  # 0 تعني النجاح في هذه المكتبة
         data = json.loads(response.body)
-        # الوصول للمنتجات من هيكل الـ JSON
         result = data.get('aliexpress_affiliate_hotproduct_query_response', {})\
                      .get('resp_result', {}).get('result', {})
         products = result.get('products', {}).get('product', [])
         return products[0] if products else None
     else:
-        print(f"API Error: {response.type} - {response.message}")
+        print(f"API Error: {response.message} (Code: {response.code})")
         return None
-
-# --- باقي الكود ---
-product = get_aliexpress_product()
-if product:
-    print("تم جلب المنتج بنجاح!")
-    # كمل باقي منطق النشر هنا...
-else:
-    print("لم يتم العثور على منتج.")
-# --- باقي الكود (generate_content و post_to_github_report) كما هو ---
-# ...
-
 
 def generate_content(prompt):
     completion = groq.chat.completions.create(
