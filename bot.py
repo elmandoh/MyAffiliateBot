@@ -22,7 +22,6 @@ def get_aliexpress_product():
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     timestamp = str(int(time.time() * 1000))
     
-    # 1. إعداد المعاملات (بدون 'sign' في البداية)
     params = {
         "app_key": app_key,
         "commission_rate_min": "1000",
@@ -34,37 +33,17 @@ def get_aliexpress_product():
         "v": "2.0"
     }
 
-    # 2. الترتيب الأبجدي الصارم للمفاتيح
+    # هنا سنبني النص بوضوح ونطبعه لنرى أين الخلل
     sorted_keys = sorted(params.keys())
+    sign_str = "".join([f"{k}{params[k]}" for k in sorted_keys])
     
-    # 3. بناء سلسلة التوقيع حسب المعيار (Secret + Key + Value + ... + Secret)
-    sign_str = app_secret
-    for key in sorted_keys:
-        sign_str += str(key) + str(params[key])
-    sign_str += app_secret
+    # سنطبع هذا السطر في الـ Logs
+    print(f"DEBUG: My Signature String is: {sign_str}")
     
-    # 4. التشفير
     sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
     params["sign"] = sign
-
-    # 5. تنفيذ الطلب
-    response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
-    data = response.json()
     
-    # طباعة الرد للتصحيح
-    print("API Response Debug:", data)
-    
-    # 6. استخراج البيانات (بدون احتمالات خطأ)
-    try:
-        resp = data.get('aliexpress_affiliate_hotproduct_query_response', {})
-        result = resp.get('resp_result', {}).get('result', {})
-        products = result.get('products', {}).get('product', [])
-        if products:
-            return products[0]
-    except Exception as e:
-        print(f"Error: {e}")
-        
-    return None
+    # ... بقية كود الطلب
 
 def generate_content(prompt):
     completion = groq.chat.completions.create(
