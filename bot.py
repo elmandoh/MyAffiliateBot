@@ -1,74 +1,55 @@
-import requests
-import json
 import os
-import random
-import requests
-import hmac
-import hashlib
-import time
+import sys
 from atproto import Client
 from groq import Groq
+import requests
 
-
-
-import zipfile
-import sys
-
-# 1. تحميل الـ SDK (يتم تحميله مرة واحدة فقط)
-sdk_zip = "aliexpress_sdk.zip"
-sdk_folder = "sdk_extracted"
-sdk_url = "https://ae-open-platform-public.oss-ap-southeast-1.aliyuncs.com/sdk/1.0.2-1699927624346NFOi.zip"
-
-if not os.path.exists(sdk_folder):
-    print("Downloading SDK...")
-    response = requests.get(sdk_url)
-    with open(sdk_zip, 'wb') as f:
-        f.write(response.content)
-    with zipfile.ZipFile(sdk_zip, 'r') as zip_ref:
-        zip_ref.extractall(sdk_folder)
-    os.remove(sdk_zip)
-
-# 2. توجيه بايثون للمسار الصحيح الذي وجدناه في الـ Logs (مجلد python)
-python_sdk_path = os.path.join(os.getcwd(), sdk_folder, "python")
+# 1. توجيه البوت للمجلد 'python' الموجود في مستودعك
+# بما أنك رفعت المجلد 'python' إلى المجلد الرئيسي للمشروع
+python_sdk_path = os.path.join(os.getcwd(), 'python')
 if python_sdk_path not in sys.path:
     sys.path.append(python_sdk_path)
-    print(f"Added SDK path: {python_sdk_path}")
 
-# 3. الآن الاستيراد سيعمل لأن المجلد 'aliexpress' أصبح في المسار
-from aliexpress.api.rest import AliexpressAffiliateHotproductQueryRequest
-from aliexpress.api import TopApiClient
-print("SDK Imported successfully!")
+# 2. استيراد المكتبة من المجلد الذي رفعته
+# وفقاً لصورك، المكتبة موجودة داخل 'python/iop'
+from iop.base import IopClient, IopRequest
 
-# 1. إعداد العملاء
+# إعداد العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-
-
 def get_aliexpress_product():
-    client = TopApiClient(
-        app_key=os.environ["ALIEXPRESS_APP_KEY"],
-        app_secret=os.environ["ALIEXPRESS_APP_SECRET"],
-        top_gateway_url="https://api-sg.aliexpress.com/sync"
-    )
+    # استخدام IopClient الخاص بالمكتبة التي رفعتها
+    app_key = os.environ["ALIEXPRESS_APP_KEY"]
+    app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     
-    req = AliexpressAffiliateHotproductQueryRequest()
-    req.commission_rate_min = "1000"
-    req.fields = "product_title,promotion_link,app_sale_price"
+    client = IopClient("https://api-sg.aliexpress.com/sync", app_key, app_secret)
+    
+    # بناء الطلب حسب هيكلية مكتبة IOP
+    request = IopRequest("aliexpress.affiliate.hotproduct.query")
+    request.add_api_param("commission_rate_min", "1000")
+    request.add_api_param("fields", "product_title,promotion_link,app_sale_price")
     
     try:
-        resp = client.execute(req)
-        # الوصول للبيانات كما هو معتاد في SDK
-        result = resp.get('aliexpress_affiliate_hotproduct_query_response', {})\
-                     .get('resp_result', {}).get('result', {})
-        products = result.get('products', {}).get('product', [])
-        return products[0] if products else None
+        response = client.execute(request)
+        if response.is_success():
+            # تحويل النص إلى JSON لاستخراج البيانات
+            import json
+            data = json.loads(response.body)
+            result = data.get('aliexpress_affiliate_hotproduct_query_response', {})\
+                         .get('resp_result', {}).get('result', {})
+            products = result.get('products', {}).get('product', [])
+            return products[0] if products else None
+        else:
+            print(f"API Error: {response.message}")
+            return None
     except Exception as e:
         print(f"Request failed: {e}")
         return None
 
-
+# --- باقي الكود (generate_content و post_to_github_report) كما هو ---
+# ...
 
 
 def generate_content(prompt):
