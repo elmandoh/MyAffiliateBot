@@ -91,7 +91,11 @@ if __name__ == "__main__":
                     # سحب بيانات المنتج الأول أوتوماتيكياً
                     live_product = products_list[0]
                     product_title = live_product.get("product_title")
-                    product_url = live_product.get("product_detail_url")
+                    
+                    # 🧹 تنظيف الرابط من أي تتبع قديم قبل ما نبعته لـ علي إكسبريس
+                    raw_url = live_product.get("product_detail_url")
+                    product_url = raw_url.split('?')[0] if raw_url else None
+                    
                     price = live_product.get("sale_price")
                     
                     print(f"📦 تم سحب المنتج بنجاح: {product_title}")
