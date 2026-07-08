@@ -33,18 +33,33 @@ def get_aliexpress_product():
         "v": "2.0"
     }
 
-    # هنا سنبني النص بوضوح ونطبعه لنرى أين الخلل
+    # الترتيب الأبجدي الصارم للمفاتيح
     sorted_keys = sorted(params.keys())
-    sign_str = "".join([f"{k}{params[k]}" for k in sorted_keys])
     
-    # سنطبع هذا السطر في الـ Logs
-    print(f"DEBUG: My Signature String is: {sign_str}")
+    # المعيار الصحيح: دمج [Key + Value] لكل البارامترات مرتبة
+    # ثم التوقيع باستخدام الـ secret
+    sign_str = ""
+    for key in sorted_keys:
+        sign_str += f"{key}{params[key]}"
     
+    # التوقيع باستخدام HMAC-SHA256
     sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
     params["sign"] = sign
-    
-    # ... بقية كود الطلب
 
+    # تنفيذ الطلب
+    response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
+    data = response.json()
+    
+    # فحص الرد
+    if 'aliexpress_affiliate_hotproduct_query_response' in data:
+        resp = data['aliexpress_affiliate_hotproduct_query_response']
+        # التحقق من وجود منتجات
+        if 'resp_result' in resp and 'result' in resp['resp_result']:
+            products = resp['resp_result']['result'].get('products', {}).get('product', [])
+            if products:
+                return products[0]
+                
+    return None
 def generate_content(prompt):
     completion = groq.chat.completions.create(
         messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile"
