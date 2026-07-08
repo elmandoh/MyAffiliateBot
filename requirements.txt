@@ -2,3 +2,4 @@ atproto
 requests
 python-dotenv
 groq
+aliextop
