@@ -16,53 +16,36 @@ bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 
-
-
+from aliextop.api.rest import AliexpressAffiliateHotproductQueryRequest
+from aliextop.api import TopApiClient
 
 def get_aliexpress_product():
-    app_key = os.environ["ALIEXPRESS_APP_KEY"]
-    app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
-    timestamp = str(int(time.time() * 1000))
+    # إعداد العميل باستخدام المكتبة الرسمية
+    # الـ gateway الرسمي لـ AliExpress
+    client = TopApiClient(
+        app_key=os.environ["ALIEXPRESS_APP_KEY"],
+        app_secret=os.environ["ALIEXPRESS_APP_SECRET"],
+        top_gateway_url="https://api-sg.aliexpress.com/sync"
+    )
     
-    # المعاملات المطلوبة للميثود
-    params = {
-        "app_key": app_key,
-        "commission_rate_min": "1000",
-        "fields": "product_title,promotion_link,app_sale_price",
-        "format": "json",
-        "method": "aliexpress.affiliate.hotproduct.query",
-        "sign_method": "hmac",
-        "timestamp": timestamp,
-        "v": "2.0"
-    }
-
-    # 1. الترتيب الأبجدي للمفاتيح (خطوة إلزامية)
-    sorted_keys = sorted(params.keys())
-    
-    # 2. بناء السلسلة: دمج المفتاح والقيمة مباشرة بدون فواصل
-    sign_str = ""
-    for key in sorted_keys:
-        sign_str += f"{key}{params[key]}"
-    
-    # 3. التشفير باستخدام HMAC-SHA256 والـ Secret
-    # ملاحظة: في بعض الأنظمة، يتم التشفير للـ sign_str فقط
-    sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
-    params["sign"] = sign
-
-    # 4. تنفيذ الطلب
-    response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
-    data = response.json()
-    
-    # 5. تصحيح الأخطاء: طباعة الرد للتأكد
-    print("API Debug:", data)
+    # إنشاء الطلب باستخدام الكلاس الرسمي
+    req = AliexpressAffiliateHotproductQueryRequest()
+    req.commission_rate_min = "1000"
+    req.fields = "product_title,promotion_link,app_sale_price"
     
     try:
-        if 'aliexpress_affiliate_hotproduct_query_response' in data:
-            products = data['aliexpress_affiliate_hotproduct_query_response'].get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
-            if products:
-                return products[0]
+        # المكتبة تتكفل بعملية التوقيع (Signing) بالكامل
+        resp = client.execute(req)
+        
+        # الوصول للبيانات (المكتبة ترجع البيانات بتنسيق Dictionary)
+        products = resp.get('aliexpress_affiliate_hotproduct_query_response', {})\
+                       .get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
+        
+        if products:
+            return products[0]
+            
     except Exception as e:
-        print(f"Error parsing: {e}")
+        print(f"SDK Error: {e}")
         
     return None
 def generate_content(prompt):
