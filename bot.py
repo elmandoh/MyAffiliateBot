@@ -26,7 +26,7 @@ def get_aliexpress_product():
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     timestamp = str(int(time.time() * 1000))
     
-    # 1. إعداد المعاملات (لاحظ الترتيب الأبجدي للمفاتيح)
+    # 1. إعداد المعاملات (يجب أن تكون قيمها سلاسل نصية)
     params = {
         "app_key": app_key,
         "commission_rate_min": "1000",
@@ -38,33 +38,39 @@ def get_aliexpress_product():
         "v": "2.0"
     }
 
-    # 2. التوقيع الرقمي (Signature) - هذا الجزء هو الأهم
-    # علي إكسبريس يطلب دمج المفتاح والقيمة مباشرة بدون فواصل
+    # 2. بناء نص التوقيع حسب معيار Open Platform
+    # الترتيب الأبجدي للمفاتيح
     sorted_keys = sorted(params.keys())
+    
+    # دمج المفاتيح والقيم: Key+Value
     sign_str = ""
     for key in sorted_keys:
-        sign_str += key + str(params[key])
+        sign_str += str(key) + str(params[key])
     
-    # التشفير باستخدام HMAC-SHA256
-    sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+    # التوقيع باستخدام HMAC-SHA256
+    # ملاحظة: في بعض إصدارات علي إكسبريس يجب إضافة Secret قبل وبعد نص التوقيع
+    # سنستخدم الطريقة المعيارية: Secret + String + Secret
+    final_sign_str = app_secret + sign_str + app_secret
+    
+    sign = hmac.new(app_secret.encode('utf-8'), final_sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
     params["sign"] = sign
 
     # 3. إرسال الطلب
+    response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
+    data = response.json()
+    
+    # 4. طباعة الرد للتأكد من نجاح التوقيع
+    print("API Response Debug:", data)
+    
     try:
-        response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
-        data = response.json()
-        
-        # 4. استخراج المنتج بأمان
+        # فحص وجود بيانات المنتج
         if 'aliexpress_affiliate_hotproduct_query_response' in data:
             result = data['aliexpress_affiliate_hotproduct_query_response'].get('resp_result', {}).get('result', {})
             products = result.get('products', {}).get('product', [])
             if products:
-                p = products[0]
-                return {"name": p['product_title'], "price": p['app_sale_price'], "link": p['promotion_link']}
-        
-        print("API Response Debug:", data) # لرؤية أي خطأ في الـ Logs
+                return products[0]
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f"Parsing error: {e}")
         
     return None
 
