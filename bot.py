@@ -27,9 +27,27 @@ def save_used_product(product_id):
 
 # 3. اقتراح المنتجات من Groq
 def get_product_ideas():
-    prompt = "Suggest 10 trending unique electronic products on AliExpress. Return ONLY a JSON list with 'name' and 'search_query' for each product."
-    response = groq.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile")
-    return json.loads(response.choices[0].message.content)
+    prompt = """Suggest 10 trending unique electronic products on AliExpress. 
+    Return ONLY a raw JSON list. Do not include any markdown, 
+    no backticks, no explanations. 
+    Format: [{"name": "Product Name", "search_query": "search query"}]"""
+    
+    response = groq.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}], 
+        model="llama-3.3-70b-versatile"
+    )
+    
+    content = response.choices[0].message.content.strip()
+    
+    # تنظيف النص من أي رموز ماركداون قد يضيفها Groq
+    content = content.replace("```json", "").replace("```", "").strip()
+    
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON: {e}")
+        print(f"Raw content received: {content}")
+        return [] # إرجاع قائمة فارغة لتجنب الانهيار
 
 # 4. البحث وجلب البيانات
 def get_aliexpress_product(query):
