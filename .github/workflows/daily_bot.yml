@@ -1,27 +1,15 @@
-name: Pro Affiliate Bot
+name: Full Manager Bot
 on:
   schedule:
-    # النشر المكثف (3 مرات في المساء - أوقات الذروة)
-    - cron: '0 18 * * *' 
-    - cron: '0 20 * * *' 
-    - cron: '0 22 * * *' 
-    # النشر الهادئ (3 مرات في الصباح والظهيرة)
-    - cron: '0 8 * * *'  
-    - cron: '0 12 * * *' 
-    - cron: '0 14 * * *' 
+    - cron: '30 9,13,17,21 * * *' # تشغيل 4 مرات يومياً بتوقيت متوازن
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install
+        run: pip install atproto groq aliexpress-api
       - name: Run Bot
         env:
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
