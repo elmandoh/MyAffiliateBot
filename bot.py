@@ -73,6 +73,15 @@ def generate_post(product):
 ideas = get_product_ideas()
 for item in ideas:
     product = get_aliexpress_product(item['search_query'])
+
+    # أضف هذه الأسطر للتشخيص
+    print(f"DEBUG: Query: {item['search_query']}")
+    if product:
+        print(f"DEBUG: Product found: {product.get('product_title')}")
+        print(f"DEBUG: Product ID: {product.get('product_id')}")
+    else:
+        print("DEBUG: No product returned from AliExpress API.")
+        
     if product and str(product['product_id']) not in get_used_products():
         # نشر المنشور
         post_text = generate_post(product)
