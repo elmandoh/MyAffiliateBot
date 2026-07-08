@@ -43,25 +43,73 @@ def call_aliexpress_api(method, api_params={}):
     return response.json()
     # ---- في آخر الملف تماماً (الأمر الفعلي للتشغيل) ----
 
+# ---- التعديل النهائي لجزء التشغيل الفعلي في آخر ملف bot.py ----
+
 if __name__ == "__main__":
-    print("🚀 بدء تشغيل البوت وجلب المنتجات من علي إكسبريس...")
+    # 1. قراءة الـ Tracking ID الجديد من الـ GitHub Secrets
+    TRACKING_ID = os.getenv("ALIEXPRESS_TRACKING_ID", "").strip()
     
-    # اسم الميثود اللي حابب تجرّب تسحب منها بيانات
-    test_method = "aliexpress.affiliate.featuredpromo.get" 
-    test_params = {
+    print("🚀 بدء تشغيل البوت وجلب البيانات...")
+    
+    # 2. خطوة جلب العروض العامة (اللي عملناها الران اللي فات)
+    promo_method = "aliexpress.affiliate.featuredpromo.get" 
+    promo_params = {
         "fields": "promo_desc,image_url,promo_name",
         "page_no": "1",
-        "page_size": "5"
+        "page_size": "1"  # هناخد عرض واحد للتجربة
     }
     
-    # استدعاء الدالة وطباعة النتيجة في اللوج
     try:
-        response_data = call_aliexpress_api(test_method, test_params)
-        print("📥 البيانات المستلمة من علي إكسبريس:")
-        print(response_data)
+        # طلب العرض من علي إكسبريس
+        promo_response = call_aliexpress_api(promo_method, promo_params)
         
-        # هنا المفروض ييجي كود الذكاء الاصطناعي (Groq) وكود النشر (Bluesky)
-        # بناءً على البيانات اللي رجعت...
+        # التأكد إن العرض رجع سليم وفيه داتا
+        resp_result = promo_response.get("aliexpress_affiliate_featuredpromo_get_response", {}).get("resp_result", {})
         
+        if resp_result.get("resp_code") == 200:
+            # لقط أول رابط لعرض متاح (الرابط العادي)
+            promo_list = resp_result.get("result", {}).get("promo_list", {}).get("featured_promo", [])
+            
+            if promo_list:
+                target_url = promo_list[0].get("promo_link")
+                promo_name = promo_list[0].get("promo_name")
+                print(f"📦 تم العثور على عرض: {promo_name}")
+                print(f"🔗 الرابط الأصلي: {target_url}")
+                
+                # 3. الخطوة السحرية: توليد رابط الآفلييت الخاص بك
+                print("🔄 جاري تحويل الرابط إلى رابط آفلييت خاص بك...")
+                link_gen_method = "aliexpress.affiliate.link.generate"
+                link_gen_params = {
+                    "tracking_id": TRACKING_ID,
+                    "promotion_link_type": "0",       # 0 تعني رابط عام / عرض
+                    "source_values": target_url        # الرابط الأصلي اللي عاوزه يتحول
+                }
+                
+                # استدعاء الـ API للتوليد
+                link_response = call_aliexpress_api(link_gen_method, link_gen_params)
+                
+                # استخراج رابط الآفلييت النهائي
+                links_result = link_response.get("aliexpress_affiliate_link_generate_response", {}).get("resp_result", {})
+                if links_result.get("resp_code") == 200:
+                    affiliate_links = links_result.get("result", {}).get("live_link_list", {}).get("live_link", [])
+                    if affiliate_links:
+                        my_affiliate_link = affiliate_links[0].get("promotion_link")
+                        
+                        print("\n==================================================")
+                        print("🎉 مبروووك! تم توليد رابط الآفلييت الخاص بك بنجاح:")
+                        print(f"💰 رابط العمولة: {my_affiliate_link}")
+                        print("==================================================\n")
+                        
+                        # [ملاحظة تذكيرية]: هنا الرابط بقى جاهز للـ Groq والـ Bluesky!
+                        
+                    else:
+                        print("⚠️ السيرفر لم يرجع روابط في القائمة.")
+                else:
+                    print(f"❌ فشل توليد الرابط. السبب: {links_result.get('resp_msg')}")
+            else:
+                print("⚠️ لم يتم العثور على أي عروض حية حالياً.")
+        else:
+            print(f"❌ فشل جلب العروض. السبب: {resp_result.get('resp_msg')}")
+            
     except Exception as e:
-        print(f"❌ حدث خطأ أثناء التشغيل: {str(e)}")
+        print(f"❌ حدث خطأ غير متوقع أثناء التشغيل: {str(e)}")
