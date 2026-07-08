@@ -14,34 +14,32 @@ from groq import Groq
 import zipfile
 import shutil
 
-# 1. إعداد المسارات
+# 1. إعدادات التحميل
 sdk_zip = "aliexpress_sdk.zip"
-sdk_folder = "aliexpress_sdk_content"
 sdk_url = "https://ae-open-platform-public.oss-ap-southeast-1.aliyuncs.com/sdk/1.0.2-1699927624346NFOi.zip"
 
-# 2. تحميل وفك الضغط تلقائياً
-if not os.path.exists(sdk_folder):
-    print("Downloading SDK...")
+# 2. تحميل وفك الضغط
+if not os.path.exists("aliexpress"): # نتحقق هل المجلد موجود بالفعل
+    print("Downloading and setting up SDK...")
     response = requests.get(sdk_url)
     with open(sdk_zip, 'wb') as f:
         f.write(response.content)
     
     with zipfile.ZipFile(sdk_zip, 'r') as zip_ref:
-        zip_ref.extractall(sdk_folder)
+        zip_ref.extractall(".") # فك الضغط في المجلد الحالي
     
-    # حذف ملف الزيپ بعد الفك
+    # تحذير: إذا فك الضغط وضع الملفات في مجلد فرعي (مثلاً sdk/aliexpress)
+    # قم بنقلها للمجلد الرئيسي
+    if os.path.exists("sdk/aliexpress"):
+        for item in os.listdir("sdk/aliexpress"):
+            shutil.move(os.path.join("sdk/aliexpress", item), item)
+    
     os.remove(sdk_zip)
-    print("SDK ready.")
+    print("SDK ready for use.")
 
-# 3. إضافة المجلد لمسار البحث الخاص ببايثون
-import sys
-sys.path.append(os.path.join(os.getcwd(), sdk_folder))
-
-# الآن يمكنك استيراد المكتبة وكأنها مثبتة
+# 3. الآن الاستيراد سيعمل مباشرة
 from aliexpress.api.rest import AliexpressAffiliateHotproductQueryRequest
 from aliexpress.api import TopApiClient
-
-
 
 
 # 1. إعداد العملاء
