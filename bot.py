@@ -11,36 +11,39 @@ from groq import Groq
 
 
 
+import os
 import zipfile
-import shutil
+import requests
+import sys
 
-# 1. إعدادات التحميل
 sdk_zip = "aliexpress_sdk.zip"
+sdk_folder = "sdk_extracted"
 sdk_url = "https://ae-open-platform-public.oss-ap-southeast-1.aliyuncs.com/sdk/1.0.2-1699927624346NFOi.zip"
 
-# 2. تحميل وفك الضغط
-if not os.path.exists("aliexpress"): # نتحقق هل المجلد موجود بالفعل
-    print("Downloading and setting up SDK...")
+if not os.path.exists(sdk_folder):
+    print("Downloading and exploring SDK...")
     response = requests.get(sdk_url)
     with open(sdk_zip, 'wb') as f:
         f.write(response.content)
     
     with zipfile.ZipFile(sdk_zip, 'r') as zip_ref:
-        zip_ref.extractall(".") # فك الضغط في المجلد الحالي
-    
-    # تحذير: إذا فك الضغط وضع الملفات في مجلد فرعي (مثلاً sdk/aliexpress)
-    # قم بنقلها للمجلد الرئيسي
-    if os.path.exists("sdk/aliexpress"):
-        for item in os.listdir("sdk/aliexpress"):
-            shutil.move(os.path.join("sdk/aliexpress", item), item)
-    
+        zip_ref.extractall(sdk_folder)
     os.remove(sdk_zip)
-    print("SDK ready for use.")
 
-# 3. الآن الاستيراد سيعمل مباشرة
-from aliexpress.api.rest import AliexpressAffiliateHotproductQueryRequest
-from aliexpress.api import TopApiClient
+# الكود السحري: إضافة كل المجلدات الفرعية لمسار بايثون
+for root, dirs, files in os.walk(sdk_folder):
+    if root not in sys.path:
+        sys.path.append(root)
+        print(f"Added to path: {root}")
 
+# الآن حاول الاستيراد (سوف ينجح لأن بايثون ستبحث في كل المجلدات)
+try:
+    from aliexpress.api.rest import AliexpressAffiliateHotproductQueryRequest
+    from aliexpress.api import TopApiClient
+    print("SDK Imported successfully!")
+except ImportError as e:
+    print(f"Import failed. Listing directories in sdk_folder: {os.listdir(sdk_folder)}")
+    raise e
 
 # 1. إعداد العملاء
 bsky = Client()
