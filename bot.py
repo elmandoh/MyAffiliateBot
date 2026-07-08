@@ -5,7 +5,7 @@ from atproto import Client
 from groq import Groq
 
 # إضافة مسار مكتبة IOP
-sys.path.append(os.getcwd())
+sys.path.append(os.path.join(os.getcwd(), 'python'))
 from iop.base import IopClient, IopRequest
 
 # إعداد العملاء
