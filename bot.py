@@ -1,5 +1,7 @@
 import os
 import random
+import datetime
+
 from atproto import Client
 from groq import Groq
 from aliexpress_api import AliexpressApi
@@ -9,6 +11,23 @@ bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 ali = AliexpressApi(os.environ["ALIEXPRESS_APP_KEY"], os.environ["ALIEXPRESS_APP_SECRET"], models="api.aliexpress.com")
+
+
+
+def get_posting_mode():
+    hour = datetime.datetime.now().hour
+    # إذا كان الوقت في الذروة، اجعله ينشر أفلييت بشكل مكثف (70% احتمال)
+    if 18 <= hour <= 23:
+        return "aggressive"
+    # غير ذلك، منشورات تفاعلية فقط (للحفاظ على السمعة)
+    return "gentle"
+
+# واستخدمها في كود النشر:
+mode = get_posting_mode()
+if mode == "aggressive":
+    content = post_affiliate() # نشر أفلييت
+else:
+    content = post_value()     # نشر قيمة وتفاعل
 
 def get_ai_content(prompt):
     chat_completion = groq.chat.completions.create(
