@@ -10,10 +10,6 @@ from atproto import Client
 from groq import Groq
 
 
-
-
-
-
 # 1. إعداد العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
@@ -26,7 +22,7 @@ def get_aliexpress_product():
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     timestamp = str(int(time.time() * 1000))
     
-    # 1. إعداد المعاملات (يجب أن تكون قيمها سلاسل نصية)
+    # المعاملات مرتبة أبجدياً (مهم جداً)
     params = {
         "app_key": app_key,
         "commission_rate_min": "1000",
@@ -38,40 +34,32 @@ def get_aliexpress_product():
         "v": "2.0"
     }
 
-    # 2. بناء نص التوقيع حسب معيار Open Platform
-    # الترتيب الأبجدي للمفاتيح
+    # بناء نص التوقيع: (مفتاح + قيمة) مرتبة أبجدياً
+    # لا تضع أي مسافات أو فواصل
     sorted_keys = sorted(params.keys())
-    
-    # دمج المفاتيح والقيم: Key+Value
     sign_str = ""
     for key in sorted_keys:
         sign_str += str(key) + str(params[key])
     
-    # التوقيع باستخدام HMAC-SHA256
-    # ملاحظة: في بعض إصدارات علي إكسبريس يجب إضافة Secret قبل وبعد نص التوقيع
-    # سنستخدم الطريقة المعيارية: Secret + String + Secret
-    final_sign_str = app_secret + sign_str + app_secret
-    
-    sign = hmac.new(app_secret.encode('utf-8'), final_sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+    # التوقيع هو HMAC-SHA256 لنص التوقيع باستخدام الـ Secret فقط
+    sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
     params["sign"] = sign
 
-    # 3. إرسال الطلب
+    # إرسال الطلب
     response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
     data = response.json()
     
-    # 4. طباعة الرد للتأكد من نجاح التوقيع
     print("API Response Debug:", data)
     
     try:
-        # فحص وجود بيانات المنتج
+        # الوصول الآمن للبيانات
         if 'aliexpress_affiliate_hotproduct_query_response' in data:
             result = data['aliexpress_affiliate_hotproduct_query_response'].get('resp_result', {}).get('result', {})
             products = result.get('products', {}).get('product', [])
             if products:
                 return products[0]
     except Exception as e:
-        print(f"Parsing error: {e}")
-        
+        print(f"Error: {e}")
     return None
 
 def generate_content(prompt):
