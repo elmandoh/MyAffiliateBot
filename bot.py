@@ -17,11 +17,14 @@ groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 
 
+
+
 def get_aliexpress_product():
     app_key = os.environ["ALIEXPRESS_APP_KEY"]
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     timestamp = str(int(time.time() * 1000))
     
+    # المعاملات المطلوبة للميثود
     params = {
         "app_key": app_key,
         "commission_rate_min": "1000",
@@ -33,32 +36,34 @@ def get_aliexpress_product():
         "v": "2.0"
     }
 
-    # الترتيب الأبجدي الصارم للمفاتيح
+    # 1. الترتيب الأبجدي للمفاتيح (خطوة إلزامية)
     sorted_keys = sorted(params.keys())
     
-    # المعيار الصحيح: دمج [Key + Value] لكل البارامترات مرتبة
-    # ثم التوقيع باستخدام الـ secret
+    # 2. بناء السلسلة: دمج المفتاح والقيمة مباشرة بدون فواصل
     sign_str = ""
     for key in sorted_keys:
         sign_str += f"{key}{params[key]}"
     
-    # التوقيع باستخدام HMAC-SHA256
+    # 3. التشفير باستخدام HMAC-SHA256 والـ Secret
+    # ملاحظة: في بعض الأنظمة، يتم التشفير للـ sign_str فقط
     sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
     params["sign"] = sign
 
-    # تنفيذ الطلب
+    # 4. تنفيذ الطلب
     response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
     data = response.json()
     
-    # فحص الرد
-    if 'aliexpress_affiliate_hotproduct_query_response' in data:
-        resp = data['aliexpress_affiliate_hotproduct_query_response']
-        # التحقق من وجود منتجات
-        if 'resp_result' in resp and 'result' in resp['resp_result']:
-            products = resp['resp_result']['result'].get('products', {}).get('product', [])
+    # 5. تصحيح الأخطاء: طباعة الرد للتأكد
+    print("API Debug:", data)
+    
+    try:
+        if 'aliexpress_affiliate_hotproduct_query_response' in data:
+            products = data['aliexpress_affiliate_hotproduct_query_response'].get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
             if products:
                 return products[0]
-                
+    except Exception as e:
+        print(f"Error parsing: {e}")
+        
     return None
 def generate_content(prompt):
     completion = groq.chat.completions.create(
