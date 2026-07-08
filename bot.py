@@ -51,6 +51,8 @@ def call_aliexpress_api(method, api_params={}):
 
 # ---- الكود الأوتوماتيكي المحدث والمقاوم للأخطاء ----
 
+# ---- الكود الأوتوماتيكي المظبوط بالـ Tracking ID ----
+
 if __name__ == "__main__":
     # 1. قراءة الـ Tracking ID من الـ Secrets
     TRACKING_ID = os.getenv("ALIEXPRESS_TRACKING_ID", "").strip()
@@ -61,8 +63,9 @@ if __name__ == "__main__":
     hot_method = "aliexpress.affiliate.hotproducts.get"
     hot_params = {
         "fields": "product_title,product_detail_url,sale_price",
-        "target_currency": "USD",  # 🌟 معامل إجباري: العملة بالدولار
-        "target_language": "EN",   # 🌟 معامل إجباري: اللغة الإنجليزية
+        "target_currency": "USD",
+        "target_language": "EN",
+        "tracking_id": TRACKING_ID,  # 🌟 ضفنا الـ Tracking ID هنا كمان عشان السيرفر يوافق
         "page_no": "1",
         "page_size": "1"
     }
@@ -71,7 +74,7 @@ if __name__ == "__main__":
         # استدعاء الـ API
         hot_response = call_aliexpress_api(hot_method, hot_params)
         
-        # [ذكاء برميجي]: فحص لو السيرفر رفض الطلب من برا خالص قبل ما يدخل في الـ Response
+        # فحص لو السيرفر رجع خطأ صريح من برا
         if "error_response" in hot_response:
             err_data = hot_response["error_response"]
             print(f"❌ رفض من منصة علي إكسبريس: {err_data.get('msg')} | التفاصيل: {err_data.get('sub_msg')}")
