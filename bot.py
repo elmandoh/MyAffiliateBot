@@ -37,9 +37,11 @@ def generate_content(prompt):
     )
     return completion.choices[0].message.content[:280]
 
+    # تأكد من هذا الجزء في دالة post_to_github_report
 def post_to_github_report(content):
     url = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/issues"
-    headers = {"Authorization": f"token {os.environ['GITHUB_TOKEN']}"}
+    # لاحظ أننا نستخدم os.environ['GITHUB_TOKEN'] الذي مررناه من الـ Workflow
+    headers = {"Authorization": f"token {os.environ['GITHUB_TOKEN']}"} 
     requests.post(url, json={"title": "Daily Bot Report", "body": f"Published: {content}"}, headers=headers)
 
 # منطق العمل
