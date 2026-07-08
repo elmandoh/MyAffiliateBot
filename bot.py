@@ -22,7 +22,7 @@ def get_aliexpress_product():
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     timestamp = str(int(time.time() * 1000))
     
-    # المعاملات مرتبة أبجدياً (مهم جداً)
+    # 1. إعداد المعاملات (بدون 'sign' في البداية)
     params = {
         "app_key": app_key,
         "commission_rate_min": "1000",
@@ -34,32 +34,36 @@ def get_aliexpress_product():
         "v": "2.0"
     }
 
-    # بناء نص التوقيع: (مفتاح + قيمة) مرتبة أبجدياً
-    # لا تضع أي مسافات أو فواصل
+    # 2. الترتيب الأبجدي الصارم للمفاتيح
     sorted_keys = sorted(params.keys())
-    sign_str = ""
+    
+    # 3. بناء سلسلة التوقيع حسب المعيار (Secret + Key + Value + ... + Secret)
+    sign_str = app_secret
     for key in sorted_keys:
         sign_str += str(key) + str(params[key])
+    sign_str += app_secret
     
-    # التوقيع هو HMAC-SHA256 لنص التوقيع باستخدام الـ Secret فقط
+    # 4. التشفير
     sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
     params["sign"] = sign
 
-    # إرسال الطلب
+    # 5. تنفيذ الطلب
     response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
     data = response.json()
     
+    # طباعة الرد للتصحيح
     print("API Response Debug:", data)
     
+    # 6. استخراج البيانات (بدون احتمالات خطأ)
     try:
-        # الوصول الآمن للبيانات
-        if 'aliexpress_affiliate_hotproduct_query_response' in data:
-            result = data['aliexpress_affiliate_hotproduct_query_response'].get('resp_result', {}).get('result', {})
-            products = result.get('products', {}).get('product', [])
-            if products:
-                return products[0]
+        resp = data.get('aliexpress_affiliate_hotproduct_query_response', {})
+        result = resp.get('resp_result', {}).get('result', {})
+        products = result.get('products', {}).get('product', [])
+        if products:
+            return products[0]
     except Exception as e:
         print(f"Error: {e}")
+        
     return None
 
 def generate_content(prompt):
