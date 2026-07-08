@@ -50,18 +50,24 @@ def get_product_ideas():
         return [] # إرجاع قائمة فارغة لتجنب الانهيار
 
 # 4. البحث وجلب البيانات
-def get_aliexpress_product(query):
+def get_affiliate_link(original_product_url):
     client = IopClient("https://api-sg.aliexpress.com/sync", os.environ["ALIEXPRESS_APP_KEY"], os.environ["ALIEXPRESS_APP_SECRET"])
-    request = IopRequest("aliexpress.affiliate.product.query")
-    request.add_api_param("keywords", query)
-    request.add_api_param("fields", "product_id,product_title,promotion_link,app_sale_price")
+    request = IopRequest("aliexpress.affiliate.link.generate")
+    request.add_api_param("promotion_link_type", "0") # 0 لإنشاء رابط أفلييت
+    request.add_api_param("source_values", original_product_url)
     
     response = client.execute(request)
     if response.code == "0":
         data = json.loads(response.body)
-        products = data.get('aliexpress_affiliate_product_query_response', {}).get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
-        return products[0] if products else None
+        return data['aliexpress_affiliate_link_generate_response']['resp_result']['result']['promotion_links']['promotion_link'][0]['promotion_link']
     return None
+
+# --- عند تشغيل البوت ---
+product = get_aliexpress_product("Smart Watch") # البحث
+if product:
+    # الحصول على رابط الأفلييت باستخدام الرابط الأصلي
+    affiliate_url = get_affiliate_link(product['product_main_image_url']) 
+    print(f"رابط الأفلييت الجاهز للنشر: {affiliate_url}")
 
 # 5. صياغة المنشور
 def generate_post(product):
