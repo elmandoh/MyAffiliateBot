@@ -1,55 +1,62 @@
-import os
-import sys
-import json
-from atproto import Client
-from groq import Groq
+import datetime
+import hashlib
+import requests
 
-# إضافة مسار مكتبة IOP
-sys.path.append(os.path.join(os.getcwd(), 'python'))
-from iop.base import IopClient, IopRequest
-
-# إعداد العملاء
-bsky = Client()
-bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
-groq = Groq(api_key=os.environ["GROQ_API_KEY"])
-
-def get_product_data(query):
-    # 1. البحث عن المنتج
-    client = IopClient("https://api-sg.aliexpress.com/sync", os.environ["ALIEXPRESS_APP_KEY"], os.environ["ALIEXPRESS_APP_SECRET"])
-    req = IopRequest("aliexpress.affiliate.product.query")
-    req.add_api_param("keywords", query)
-    req.add_api_param("fields", "product_id,product_detail_url,product_title,app_sale_price")
+def generate_aliexpress_sign(params, secret_key):
+    """
+    توليد التوقيع الرقمي (Signature) بالطريقة الصارمة لعلي إكسبريس
+    """
+    # 1. ترتيب المفاتيح أبجدياً
+    sorted_keys = sorted(params.keys())
     
-    resp = client.execute(req)
-    if resp.code == "0":
-        data = json.loads(resp.body)
-        products = data.get('aliexpress_affiliate_product_query_response', {}).get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
-        return products[0] if products else None
-    return None
-
-def generate_affiliate_link(original_url):
-    # 2. تحويل الرابط إلى رابط أفلييت
-    client = IopClient("https://api-sg.aliexpress.com/sync", os.environ["ALIEXPRESS_APP_KEY"], os.environ["ALIEXPRESS_APP_SECRET"])
-    req = IopRequest("aliexpress.affiliate.link.generate")
-    req.add_api_param("promotion_link_type", "0")
-    req.add_api_param("source_values", original_url)
+    # 2. بناء سلسلة التشفير: Secret + Key1Value1Key2Value2 + Secret
+    sign_string = secret_key
+    for key in sorted_keys:
+        sign_string += f"{key}{params[key]}"
+    sign_string += secret_key
     
-    resp = client.execute(req)
-    if resp.code == "0":
-        data = json.loads(resp.body)
-        return data['aliexpress_affiliate_link_generate_response']['resp_result']['result']['promotion_links']['promotion_link'][0]['promotion_link']
-    return None
+    # 3. التشفير بـ MD5 وتحويل الحروف لكبيرة Uppercase
+    return hashlib.md5(sign_string.encode('utf-8')).hexdigest().upper()
 
-# --- منطق التشغيل ---
-query = "Smart Watch" # أو اجعلها من Groq
-product = get_product_data(query)
+def call_aliexpress_api(app_key, secret_key, method, api_params={}):
+    # الرابط الرسمي للـ API
+    url = "https://gw.api.taobao.com/router/rest"
+    
+    # الـ Parameters الأساسية للنظام (System Parameters)
+    sys_params = {
+        "app_key": app_key,
+        "method": method,
+        "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), # توقيت UTC
+        "format": "json",
+        "v": "2.0",
+        "sign_method": "md5"
+    }
+    
+    # دمج بارامترز النظام مع بارامترز الطلب الخاص بك
+    all_params = {**sys_params, **api_params}
+    
+    # توليد الـ Sign وإضافته للطلب
+    all_params["sign"] = generate_aliexpress_sign(all_params, secret_key)
+    
+    # إرسال الطلب كـ Form Data (وليس JSON)
+    try:
+        response = requests.post(url, data=all_params)
+        return response.json()
+    except Exception as e:
+        return {"error": f"Connection failed: {str(e)}"}
 
-if product:
-    affiliate_link = generate_affiliate_link(product['product_detail_url'])
-    if affiliate_link:
-        print(f"تم الحصول على الرابط: {affiliate_link}")
-        # هنا تكملة كود النشر على Bluesky...
-    else:
-        print("فشل تحويل الرابط.")
-else:
-    print("لم يتم العثور على المنتج.")
+# --- تجربة تشغيل للـ API ---
+# اكتب بياناتك هنا للتجربة
+APP_KEY = "538772" 
+SECRET_KEY = "JBnvT1ynfADkeOUk076fP9eXT0OJJzxK "
+
+# تجربة ميثود بسيطة لجلب العروض كمثال للاختبار
+test_method = "aliexpress.affiliate.featuredpromo.get" 
+test_params = {
+    "fields": "promo_desc,image_url,promo_name",
+    "page_no": "1",
+    "page_size": "10"
+}
+
+result = call_aliexpress_api(APP_KEY, SECRET_KEY, test_method, test_params)
+print(result)
