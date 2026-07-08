@@ -63,7 +63,7 @@ def get_affiliate_link(original_product_url):
     return None
 
 # --- عند تشغيل البوت ---
-product = get_aliexpress_product("Smart Watch") # البحث
+product = get_affiliate_link("Smart Watch") # البحث
 if product:
     # الحصول على رابط الأفلييت باستخدام الرابط الأصلي
     affiliate_url = get_affiliate_link(product['product_main_image_url']) 
