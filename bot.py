@@ -11,39 +11,33 @@ from groq import Groq
 
 
 
-import os
 import zipfile
-import requests
 import sys
 
+# 1. تحميل الـ SDK (يتم تحميله مرة واحدة فقط)
 sdk_zip = "aliexpress_sdk.zip"
 sdk_folder = "sdk_extracted"
 sdk_url = "https://ae-open-platform-public.oss-ap-southeast-1.aliyuncs.com/sdk/1.0.2-1699927624346NFOi.zip"
 
 if not os.path.exists(sdk_folder):
-    print("Downloading and exploring SDK...")
+    print("Downloading SDK...")
     response = requests.get(sdk_url)
     with open(sdk_zip, 'wb') as f:
         f.write(response.content)
-    
     with zipfile.ZipFile(sdk_zip, 'r') as zip_ref:
         zip_ref.extractall(sdk_folder)
     os.remove(sdk_zip)
 
-# الكود السحري: إضافة كل المجلدات الفرعية لمسار بايثون
-for root, dirs, files in os.walk(sdk_folder):
-    if root not in sys.path:
-        sys.path.append(root)
-        print(f"Added to path: {root}")
+# 2. توجيه بايثون للمسار الصحيح الذي وجدناه في الـ Logs (مجلد python)
+python_sdk_path = os.path.join(os.getcwd(), sdk_folder, "python")
+if python_sdk_path not in sys.path:
+    sys.path.append(python_sdk_path)
+    print(f"Added SDK path: {python_sdk_path}")
 
-# الآن حاول الاستيراد (سوف ينجح لأن بايثون ستبحث في كل المجلدات)
-try:
-    from aliexpress.api.rest import AliexpressAffiliateHotproductQueryRequest
-    from aliexpress.api import TopApiClient
-    print("SDK Imported successfully!")
-except ImportError as e:
-    print(f"Import failed. Listing directories in sdk_folder: {os.listdir(sdk_folder)}")
-    raise e
+# 3. الآن الاستيراد سيعمل لأن المجلد 'aliexpress' أصبح في المسار
+from aliexpress.api.rest import AliexpressAffiliateHotproductQueryRequest
+from aliexpress.api import TopApiClient
+print("SDK Imported successfully!")
 
 # 1. إعداد العملاء
 bsky = Client()
@@ -51,38 +45,32 @@ bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 
-from aliextop.api.rest import AliexpressAffiliateHotproductQueryRequest
-from aliextop.api import TopApiClient
 
 def get_aliexpress_product():
-    # إعداد العميل باستخدام المكتبة الرسمية
-    # الـ gateway الرسمي لـ AliExpress
     client = TopApiClient(
         app_key=os.environ["ALIEXPRESS_APP_KEY"],
         app_secret=os.environ["ALIEXPRESS_APP_SECRET"],
         top_gateway_url="https://api-sg.aliexpress.com/sync"
     )
     
-    # إنشاء الطلب باستخدام الكلاس الرسمي
     req = AliexpressAffiliateHotproductQueryRequest()
     req.commission_rate_min = "1000"
     req.fields = "product_title,promotion_link,app_sale_price"
     
     try:
-        # المكتبة تتكفل بعملية التوقيع (Signing) بالكامل
         resp = client.execute(req)
-        
-        # الوصول للبيانات (المكتبة ترجع البيانات بتنسيق Dictionary)
-        products = resp.get('aliexpress_affiliate_hotproduct_query_response', {})\
-                       .get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
-        
-        if products:
-            return products[0]
-            
+        # الوصول للبيانات كما هو معتاد في SDK
+        result = resp.get('aliexpress_affiliate_hotproduct_query_response', {})\
+                     .get('resp_result', {}).get('result', {})
+        products = result.get('products', {}).get('product', [])
+        return products[0] if products else None
     except Exception as e:
-        print(f"SDK Error: {e}")
-        
-    return None
+        print(f"Request failed: {e}")
+        return None
+
+
+
+
 def generate_content(prompt):
     completion = groq.chat.completions.create(
         messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile"
