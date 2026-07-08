@@ -41,3 +41,27 @@ def call_aliexpress_api(method, api_params={}):
     
     response = requests.post(url, data=all_params, timeout=10)
     return response.json()
+    # ---- في آخر الملف تماماً (الأمر الفعلي للتشغيل) ----
+
+if __name__ == "__main__":
+    print("🚀 بدء تشغيل البوت وجلب المنتجات من علي إكسبريس...")
+    
+    # اسم الميثود اللي حابب تجرّب تسحب منها بيانات
+    test_method = "aliexpress.affiliate.featuredpromo.get" 
+    test_params = {
+        "fields": "promo_desc,image_url,promo_name",
+        "page_no": "1",
+        "page_size": "5"
+    }
+    
+    # استدعاء الدالة وطباعة النتيجة في اللوج
+    try:
+        response_data = call_aliexpress_api(test_method, test_params)
+        print("📥 البيانات المستلمة من علي إكسبريس:")
+        print(response_data)
+        
+        # هنا المفروض ييجي كود الذكاء الاصطناعي (Groq) وكود النشر (Bluesky)
+        # بناءً على البيانات اللي رجعت...
+        
+    except Exception as e:
+        print(f"❌ حدث خطأ أثناء التشغيل: {str(e)}")
