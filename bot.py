@@ -1,32 +1,39 @@
 import os
-import requests
+import random
 from atproto import Client
 from groq import Groq
+from aliexpress_api import AliexpressApi
 
-# 1. إعداد العملاء (Clients)
+# إعدادات العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
-
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
+ali = AliexpressApi(os.environ["ALIEXPRESS_APP_KEY"], os.environ["ALIEXPRESS_APP_SECRET"], models="api.aliexpress.com")
 
-def get_aliexpress_product():
-    # هنا ستضع الكود الخاص بـ AliExpress API لجلب منتج
-    # للتجربة سنستخدم نصاً وهمياً
-    return {"name": "ساعة ذكية مميزة", "price": "$25", "link": "https://aliexpress.com/item/123"}
-
-def generate_post(product):
-    prompt = f"اكتب منشوراً تسويقياً جذاباً لمنصة Bluesky لهذا المنتج: {product['name']} بسعر {product['price']}. الرابط: {product['link']}"
-    
+def get_ai_content(prompt):
     chat_completion = groq.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
     )
-    return chat_completion.choices[0].message.content
+    return chat_completion.choices[0].message.content[:290]
 
-# تنفيذ العمليات
-product = get_aliexpress_product()
-post_content = generate_post(product)
+def post_affiliate():
+    products = ali.get_hot_products(cat_ids=[34], limit=1) # الإلكترونيات
+    p = products[0]
+    prompt = f"اكتب منشوراً تسويقياً محفزاً بأسلوب احترافي لمنتج: {p.product_title}. السعر: {p.app_sale_price}. الرابط: {p.promotion_link}. اجعله مشوقاً بدون مبالغة."
+    return get_ai_content(prompt)
 
-# النشر
-bsky.send_post(text=post_content)
-print("تم النشر بنجاح!")
+def post_value():
+    topics = ["نصيحة تقنية سريعة", "أحدث صيحات الذكاء الاصطناعي", "كيف تختار أفضل الأدوات الذكية"]
+    topic = random.choice(topics)
+    prompt = f"اكتب تغريدة قصيرة ومفيدة جداً للمتابعين حول موضوع: {topic}. اجعلها تشجع على النقاش."
+    return get_ai_content(prompt)
+
+# التشغيل الذكي (50% أفلييت، 50% تفاعل)
+if random.choice([True, False]):
+    content = post_affiliate()
+else:
+    content = post_value()
+
+bsky.send_post(text=content)
+print(f"تم النشر بنجاح: {content}")
