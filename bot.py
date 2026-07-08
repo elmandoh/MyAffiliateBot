@@ -20,7 +20,7 @@ def generate_aliexpress_sign(params, secret_key):
 
 def call_aliexpress_api(app_key, secret_key, method, api_params={}):
     # الرابط الرسمي للـ API
-    url = "https://gw.api.taobao.com/router/rest"
+    url = "https://api-sg.aliexpress.com/sync/api/asyn"
     
     # الـ Parameters الأساسية للنظام (System Parameters)
     sys_params = {
