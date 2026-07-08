@@ -17,7 +17,6 @@ def get_aliexpress_product():
     app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
     timestamp = str(int(time.time() * 1000))
     
-    # البارامترات الأساسية التي تتوافق مع توثيق AliExpress الرسمي
     params = {
         "app_key": app_key,
         "format": "json",
@@ -29,27 +28,41 @@ def get_aliexpress_product():
         "commission_rate_min": "1000"
     }
 
-    # ترتيب البارامترات حسب الأبجدية (شرط أساسي لنجاح التوقيع)
+    # التوقيع الرقمي (Signature)
     keys = sorted(params.keys())
     sign_str = "".join([f"{k}{params[k]}" for k in keys])
     params["sign"] = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
 
     response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
     data = response.json()
-
-    # فحص الأخطاء من علي إكسبريس نفسه
-    if "error_response" in data:
-        raise Exception(f"AliExpress API Error: {data['error_response']['msg']}")
-
-    # الوصول المباشر للبيانات بدون احتمالات خطأ
-    resp = data['aliexpress_affiliate_hotproduct_query_response']['resp_result']['result']
-    product = resp['products']['product'][0] # أخذ أول منتج فقط
     
-    return {
-        "name": product['product_title'],
-        "price": product['app_sale_price'],
-        "link": product['promotion_link']
-    }
+    # --- سحر الحل هنا: البحث الذكي عن البيانات ---
+    # نستخدم دالة recursive للبحث عن 'product_title' في أي مكان داخل الرد
+    def find_key(obj, key):
+        if key in obj: return obj[key]
+        for v in obj.values():
+            if isinstance(v, dict):
+                res = find_key(v, key)
+                if res: return res
+        return None
+
+    try:
+        # استخراج البيانات بمرونة
+        title = find_key(data, 'product_title')
+        link = find_key(data, 'promotion_link')
+        price = find_key(data, 'app_sale_price')
+        
+        if title and link:
+            return {"name": title, "price": price, "link": link}
+        else:
+            print("لم يتم العثور على منتجات في الرد. الرد الكامل:", data)
+            return None
+    except Exception as e:
+        print(f"حدث خطأ أثناء المعالجة: {e}")
+        return None
+
+
+
 def generate_content(prompt):
     completion = groq.chat.completions.create(
         messages=[{"role": "user", "content": prompt}], model="llama-3.3-70b-versatile"
