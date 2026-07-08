@@ -49,6 +49,8 @@ def call_aliexpress_api(method, api_params={}):
 
 # ---- الكود الأوتوماتيكي بالكامل: سحب وتحويل ديناميكي ----
 
+# ---- الكود الأوتوماتيكي المحدث والمقاوم للأخطاء ----
+
 if __name__ == "__main__":
     # 1. قراءة الـ Tracking ID من الـ Secrets
     TRACKING_ID = os.getenv("ALIEXPRESS_TRACKING_ID", "").strip()
@@ -56,69 +58,70 @@ if __name__ == "__main__":
     print("🚀 بدء تشغيل البوت الأوتوماتيكي...")
     print("📥 جاري سحب المنتجات الأكثر مبيعاً (Hot Products) حالياً...")
     
-    # استخدام ميثود المنتجات الأكثر مبيعاً المتاحة في حسابك
     hot_method = "aliexpress.affiliate.hotproducts.get"
     hot_params = {
         "fields": "product_title,product_detail_url,sale_price",
+        "target_currency": "USD",  # 🌟 معامل إجباري: العملة بالدولار
+        "target_language": "EN",   # 🌟 معامل إجباري: اللغة الإنجليزية
         "page_no": "1",
-        "page_size": "1"  # هناخد أول منتج متصدر علطول
+        "page_size": "1"
     }
     
     try:
-        # استدعاء الـ API لسحب المنتجات
+        # استدعاء الـ API
         hot_response = call_aliexpress_api(hot_method, hot_params)
         
-        # فك تشفير الـ JSON القادم من السيرفر
-        resp_result = hot_response.get("aliexpress_affiliate_hotproducts_get_response", {}).get("resp_result", {})
-        
-        if resp_result.get("resp_code") == 200:
-            products_list = resp_result.get("result", {}).get("products", {}).get("product", [])
-            
-            if products_list:
-                # سحب بيانات المنتج الأول أوتوماتيكياً
-                live_product = products_list[0]
-                product_title = live_product.get("product_title")
-                product_url = live_product.get("product_detail_url") # الرابط الأصلي للمنتج
-                price = live_product.get("sale_price")
-                
-                print(f"📦 تم سحب المنتج بنجاح: {product_title}")
-                print(f"💰 السعر الحالي: {price}")
-                print(f"🔗 الرابط الأصلي المسحوب: {product_url}")
-                
-                # 2. خطوة التحويل الفوري لروابط الآفلييت الخاصة بك
-                print("🔄 جاري تحويل الرابط أوتوماتيكياً إلى رابط العمولة الخاص بك...")
-                link_gen_method = "aliexpress.affiliate.link.generate"
-                link_gen_params = {
-                    "tracking_id": TRACKING_ID,
-                    "promotion_link_type": "0", 
-                    "source_values": product_url  # الرابط اللي اتسحب أوتوماتيك فوق
-                }
-                
-                # توليد رابط الآفلييت
-                link_response = call_aliexpress_api(link_gen_method, link_gen_params)
-                links_result = link_response.get("aliexpress_affiliate_link_generate_response", {}).get("resp_result", {})
-                
-                if links_result.get("resp_code") == 200:
-                    affiliate_links = links_result.get("result", {}).get("live_link_list", {}).get("live_link", [])
-                    if affiliate_links:
-                        my_affiliate_link = affiliate_links[0].get("promotion_link")
-                        
-                        print("\n==================================================")
-                        print("🎉 نجاح باهر! السيستم سحب وحوّل بالكامل أوتوماتيك:")
-                        print(f"📢 المنتج: {product_title}")
-                        print(f"💸 رابط الآفلييت المبروك: {my_affiliate_link}")
-                        print("==================================================\n")
-                        
-                        # هنا نقدر نبعت النص الجاهز ده لـ Groq و Bluesky في الخطوة الجاية!
-                        
-                    else:
-                        print("⚠️ السيرفر لم يرجع روابط آفلييت في القائمة.")
-                else:
-                    print(f"❌ فشل توليد رابط الآفلييت. السبب: {links_result.get('resp_msg')}")
-            else:
-                print("⚠️ قائمة المنتجات الأكثر مبيعاً رجعت فارغة من السيرفر.")
+        # [ذكاء برميجي]: فحص لو السيرفر رفض الطلب من برا خالص قبل ما يدخل في الـ Response
+        if "error_response" in hot_response:
+            err_data = hot_response["error_response"]
+            print(f"❌ رفض من منصة علي إكسبريس: {err_data.get('msg')} | التفاصيل: {err_data.get('sub_msg')}")
         else:
-            print(f"❌ فشل سحب المنتجات. السبب: {resp_result.get('resp_msg')}")
+            resp_result = hot_response.get("aliexpress_affiliate_hotproducts_get_response", {}).get("resp_result", {})
             
+            if resp_result.get("resp_code") == 200:
+                products_list = resp_result.get("result", {}).get("products", {}).get("product", [])
+                
+                if products_list:
+                    # سحب بيانات المنتج الأول أوتوماتيكياً
+                    live_product = products_list[0]
+                    product_title = live_product.get("product_title")
+                    product_url = live_product.get("product_detail_url")
+                    price = live_product.get("sale_price")
+                    
+                    print(f"📦 تم سحب المنتج بنجاح: {product_title}")
+                    print(f"💰 السعر الحالي: {price}")
+                    print(f"🔗 الرابط الأصلي المسحوب: {product_url}")
+                    
+                    # 2. خطوة التحويل الفوري لروابط الآفلييت الخاصة بك
+                    print("🔄 جاري تحويل الرابط أوتوماتيكياً إلى رابط العمولة الخاص بك...")
+                    link_gen_method = "aliexpress.affiliate.link.generate"
+                    link_gen_params = {
+                        "tracking_id": TRACKING_ID,
+                        "promotion_link_type": "0", 
+                        "source_values": product_url
+                    }
+                    
+                    link_response = call_aliexpress_api(link_gen_method, link_gen_params)
+                    links_result = link_response.get("aliexpress_affiliate_link_generate_response", {}).get("resp_result", {})
+                    
+                    if links_result.get("resp_code") == 200:
+                        affiliate_links = links_result.get("result", {}).get("live_link_list", {}).get("live_link", [])
+                        if affiliate_links:
+                            my_affiliate_link = affiliate_links[0].get("promotion_link")
+                            
+                            print("\n==================================================")
+                            print("🎉 نجاح باهر! السيستم سحب وحوّل بالكامل أوتوماتيك:")
+                            print(f"📢 المنتج: {product_title}")
+                            print(f"💸 رابط الآفلييت المبروك: {my_affiliate_link}")
+                            print("==================================================\n")
+                        else:
+                            print("⚠️ السيرفر استجاب ولكن قائمة روابط الآفلييت فارغة.")
+                    else:
+                        print(f"❌ فشل توليد رابط الآفلييت. السبب: {links_result.get('resp_msg')}")
+                else:
+                    print("⚠️ قائمة المنتجات الأكثر مبيعاً رجعت فارغة من السيرفر.")
+            else:
+                print(f"❌ فشل سحب المنتجات. السبب: {resp_result.get('resp_msg')}")
+                
     except Exception as e:
         print(f"❌ حدث خطأ غير متوقع في الدورة الأوتوماتيكية: {str(e)}")
