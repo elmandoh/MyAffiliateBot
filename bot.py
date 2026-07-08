@@ -7,51 +7,35 @@ import time
 from atproto import Client
 from groq import Groq
 
+
+# بعد تثبيت المكتبة أو وضعها في المجلد
+from aliextop.api.rest import AliexpressAffiliateHotproductQueryRequest
+from aliextop.api import TopApiClient
+
 # 1. إعداد العملاء
 bsky = Client()
 bsky.login(os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_PASSWORD"])
 groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 def get_aliexpress_product():
-    app_key = os.environ["ALIEXPRESS_APP_KEY"]
-    app_secret = os.environ["ALIEXPRESS_APP_SECRET"]
+    # إعداد العميل الرسمي
+    client = TopApiClient(app_key=os.environ["ALIEXPRESS_APP_KEY"], 
+                          app_secret=os.environ["ALIEXPRESS_APP_SECRET"], 
+                          top_gateway_url="https://api-sg.aliexpress.com/sync")
     
-    params = {
-        "app_key": app_key,
-        "format": "json",
-        "method": "aliexpress.affiliate.hotproduct.query",
-        "sign_method": "hmac",
-        "timestamp": str(int(time.time() * 1000)),
-        "v": "2.0",
-        "fields": "product_title,promotion_link,app_sale_price",
-        "commission_rate_min": "1000"
-    }
-
-    # الترتيب الأبجدي الصارم (سر نجاح التوقيع)
-    sorted_keys = sorted(params.keys())
-    sign_str = "".join([f"{k}{params[k]}" for k in sorted_keys])
+    # طلب المنتج باستخدام الكلاس الجاهز (بدون تعقيد التوقيع)
+    req = AliexpressAffiliateHotproductQueryRequest()
+    req.commission_rate_min = "1000"
+    req.fields = "product_title,promotion_link,app_sale_price"
     
-    # إنشاء التوقيع
-    sign = hmac.new(app_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
-    params["sign"] = sign
-
-    response = requests.get("https://api-sg.aliexpress.com/sync", params=params)
-    data = response.json()
-    
-    # فحص النتيجة
     try:
-        resp = data.get('aliexpress_affiliate_hotproduct_query_response', {})
-        res_result = resp.get('resp_result', {})
-        result = res_result.get('result', {})
-        products = result.get('products', {}).get('product', [])
-        
-        if products:
-            p = products[0]
-            return {"name": p['product_title'], "price": p['app_sale_price'], "link": p['promotion_link']}
-    except:
-        pass
-    return None
-
+        resp = client.execute(req)
+        # المكتبة ستقوم بإرجاع البيانات جاهزة ومنظمة
+        # هنا تتعامل مع الرد مباشرة
+        return resp.get('products')[0] 
+    except Exception as e:
+        print(f"Error using SDK: {e}")
+        return None
 
 def generate_content(prompt):
     completion = groq.chat.completions.create(
