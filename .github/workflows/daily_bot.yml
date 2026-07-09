@@ -1,30 +1,12 @@
-name: Auto Affiliate Bot
-on:
-  schedule:
-    - cron: '0 0 * * *' # يعمل يومياً في منتصف الليل
-  workflow_dispatch: # يتيح لك تشغيله يدوياً من زر Run workflow
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - name: Install dependencies
-        run: pip install requests
-      - name: Run Bot
-        env:
-          ALIEXPRESS_APP_KEY: ${{ secrets.ALIEXPRESS_APP_KEY }}
-          ALIEXPRESS_APP_SECRET: ${{ secrets.ALIEXPRESS_APP_SECRET }}
-          ALIEXPRESS_TRACKING_ID: ${{ secrets.ALIEXPRESS_TRACKING_ID }}
-        run: python bot.py
-      - name: Commit and Push
+- name: Commit and Push
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add products_feed.xml
-          git commit -m "Update products_feed.xml daily"
-          git push
+          # التحقق من وجود الملف قبل إضافته
+          if [ -f "products_feed.xml" ]; then
+            git add products_feed.xml
+            git commit -m "Update products_feed.xml daily"
+            git push
+          else
+            echo "File products_feed.xml not found, skipping commit."
+          fi
